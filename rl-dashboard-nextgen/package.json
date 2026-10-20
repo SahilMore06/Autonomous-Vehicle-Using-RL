@@ -1,0 +1,28 @@
+{
+  "name": "autonomous-vehicle-using-rl-dashboard",
+  "version": "2.0.0",
+  "description": "Real-time Telemetry Dashboard & Simulation Cockpit for Autonomous Vehicle Using RL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "cd client && npm run build && cd .."
+  },
+  "keywords": [
+    "autonomous-vehicle",
+    "reinforcement-learning",
+    "q-learning",
+    "telemetry-dashboard",
+    "sfml",
+    "websocket",
+    "react",
+    "robotics"
+  ],
+  "author": "Autonomous Vehicle RL Research Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  }
+}

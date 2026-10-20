@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew & SFML
+        run: |
+          brew install sfml cmake
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: rl-dashboard-nextgen/package-lock.json
+
+      - name: Build C++ Simulator
+        run: |
+          cd autonomus/autonomous-rl-vehicle/simulator
+          mkdir -p build && cd build
+          cmake .. && cmake --build .
+
+      - name: Install Dashboard Server Dependencies
+        run: |
+          cd rl-dashboard-nextgen
+          npm install
+
+      - name: Build Dashboard Client
+        run: |
+          cd rl-dashboard-nextgen/client
+          npm install
+          npm run build

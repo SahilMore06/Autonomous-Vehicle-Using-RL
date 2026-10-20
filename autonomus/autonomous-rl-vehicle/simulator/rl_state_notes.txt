@@ -1,0 +1,8 @@
+RLState struct added to main.cpp; use RLState as the observation fed to RL agent. Fields:
+- front: front sensor distance (normalized)
+- left: left-side sensor distance (normalized)
+- right: right-side sensor distance (normalized)
+- speed: normalized speed
+- steering: normalized steering angle
+
+Agent should output a `Car::Action` value (DO_NOTHING..TURN_RIGHT).

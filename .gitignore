@@ -1,0 +1,69 @@
+# ==============================================================================
+# Autonomous Vehicle Using RL - .gitignore
+# ==============================================================================
+
+# Dependencies
+node_modules/
+*/node_modules/
+.venv/
+*.pyc
+__pycache__/
+
+# Build Artifacts & Intermediate Compiler Files
+build/
+*/build/
+dist/
+CMakeFiles/
+Makefile
+cmake_install.cmake
+CMakeCache.txt
+*.o
+*.so
+*.dylib
+*.a
+
+# Windows Installer Binaries & Large Archives (>10MB)
+*.exe
+*.dll
+*.zip
+*.7z
+PortableGit/
+autonomus/PortableGit/
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Agent Configurations
+.vscode/
+.idea/
+.agent/
+.agents/
+.gemini/
+.gsd/
+*.swp
+*.swo
+*~
+
+# Logs & Temporary Files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+.tmp/
+temp/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+
+# Keep Pre-trained Model & Pre-built Dashboard Bundle
+!autonomus/autonomous-rl-vehicle/simulator/q_table.bin
+!rl-dashboard-nextgen/client/build/
+!rl-dashboard-nextgen/client/build/**
