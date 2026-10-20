@@ -475,7 +475,8 @@ void saveStateJSON(const std::string& filename,
                    float steering, const std::vector<float>& sensors, 
                    int collisions, const std::string& lastAction,
                    unsigned int windowWidth, unsigned int windowHeight) {
-    std::ofstream f(filename);
+    std::string tmpFilename = filename + ".tmp";
+    std::ofstream f(tmpFilename);
     if (!f.is_open()) return;
 
     f << "{\n";
@@ -490,11 +491,11 @@ void saveStateJSON(const std::string& filename,
     f << "  \"steering\": " << std::setprecision(3) << steering << ",\n";
     f << "  \"sensors\": {";
     if (sensors.size() >= 5) {
-        f << "\"front\": " << std::setprecision(1) << sensors[0] << ", ";
-        f << "\"left\": " << sensors[1] << ", ";
-        f << "\"right\": " << sensors[2] << ", ";
-        f << "\"front_left\": " << sensors[3] << ", ";
-        f << "\"front_right\": " << sensors[4];
+        f << "\"front\": " << std::setprecision(3) << sensors[0] << ", ";
+        f << "\"front_left\": " << sensors[1] << ", ";
+        f << "\"front_right\": " << sensors[2] << ", ";
+        f << "\"left\": " << sensors[3] << ", ";
+        f << "\"right\": " << sensors[4];
     }
     f << "},\n";
     f << "  \"collisions\": " << collisions << ",\n";
@@ -503,6 +504,9 @@ void saveStateJSON(const std::string& filename,
     f << "  \"window_height\": " << windowHeight << "\n";
     f << "}\n";
     f.close();
+
+    // Atomic replace to prevent reading partial JSON
+    std::rename(tmpFilename.c_str(), filename.c_str());
 }
 
 int main() {
