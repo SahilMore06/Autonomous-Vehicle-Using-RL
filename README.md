@@ -359,7 +359,7 @@ python3 generate_qtable.py
 ## 🤝 Contributing
 
 Contributions, issues, and feature requests are welcome!
-Feel free to check the [issues page](https://github.com/sahil/Autonomous-Vehicle-Using-RL/issues).
+Feel free to check the [issues page](https://github.com/SahilMore06/Autonomous-Vehicle-Using-RL/issues).
 
 1. Fork the Project.
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
