@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   Camera,
   RotateCcw,
@@ -16,7 +17,7 @@ import { COLLISION_OBSTACLES } from '../collisionData';
 const SimContainer = styled.div`
   position: relative;
   width: 100%;
-  height: 480px;
+  height: 490px;
   background: #06101F;
   border-radius: 8px;
   overflow: hidden;
@@ -24,11 +25,11 @@ const SimContainer = styled.div`
   box-shadow: ${THEME.cardShadow};
 
   @media (max-width: 1200px) {
-    height: 400px;
+    height: 420px;
   }
 
   @media (max-width: 768px) {
-    height: 340px;
+    height: 350px;
   }
 `;
 
@@ -43,7 +44,7 @@ const LidarHud = styled.div`
   position: absolute;
   top: 14px;
   left: 14px;
-  background: rgba(11, 25, 43, 0.88);
+  background: rgba(11, 25, 43, 0.90);
   backdrop-filter: blur(8px);
   border: 1px solid ${THEME.border};
   border-radius: 6px;
@@ -53,7 +54,7 @@ const LidarHud = styled.div`
   gap: 6px;
   z-index: 10;
   pointer-events: none;
-  min-width: 170px;
+  min-width: 175px;
 
   .title {
     font-size: 0.68rem;
@@ -96,7 +97,7 @@ const CameraControls = styled.div`
 `;
 
 const ControlButton = styled.button`
-  background: rgba(11, 25, 43, 0.88);
+  background: rgba(11, 25, 43, 0.90);
   backdrop-filter: blur(8px);
   border: 1px solid ${props => props.$active ? 'rgba(50, 133, 255, 0.55)' : THEME.border};
   color: ${props => props.$active ? '#ffffff' : THEME.textSecondary};
@@ -123,14 +124,14 @@ const MinimapWrapper = styled.div`
   position: absolute;
   bottom: 14px;
   left: 14px;
-  width: 130px;
-  height: 130px;
-  background: rgba(6, 16, 31, 0.90);
+  width: 135px;
+  height: 135px;
+  background: rgba(6, 16, 31, 0.92);
   border: 1px solid ${THEME.border};
   border-radius: 6px;
   overflow: hidden;
   z-index: 10;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
 
   canvas {
     width: 100%;
@@ -144,14 +145,14 @@ const KeyGuide = styled.div`
   position: absolute;
   bottom: 14px;
   right: 14px;
-  background: rgba(11, 25, 43, 0.88);
+  background: rgba(11, 25, 43, 0.90);
   backdrop-filter: blur(8px);
   border: 1px solid ${THEME.border};
   border-radius: 6px;
   padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   z-index: 10;
   font-size: 0.72rem;
   color: ${THEME.textSecondary};
@@ -178,7 +179,7 @@ const SimToolbar = styled.div`
   align-items: center;
   gap: 8px;
   z-index: 10;
-  background: rgba(11, 25, 43, 0.88);
+  background: rgba(11, 25, 43, 0.90);
   backdrop-filter: blur(8px);
   border: 1px solid ${THEME.border};
   border-radius: 8px;
@@ -199,16 +200,15 @@ export default function Simulation3D({
 
   const [cameraMode, setCameraMode] = useState('follow'); // 'follow', 'top', 'orbit'
 
-  // Three.js instances stored in refs
+  // Three.js instances
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
   const controlsRef = useRef(null);
   const carGroupRef = useRef(null);
-  const lidarRaysRef = useRef([]);
+  const lidarLinesRef = useRef([]);
   const lidarHitsRef = useRef([]);
 
-  // Telemetry reference for animation loop
   const telemetryRef = useRef(telemetry);
   telemetryRef.current = telemetry;
 
@@ -223,15 +223,15 @@ export default function Simulation3D({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // 1. Scene & Cinematic Fog
+    // 1. Scene & Environment
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x06101F);
-    scene.fog = new THREE.FogExp2(0x06101F, 0.0035);
+    scene.fog = new THREE.FogExp2(0x06101F, 0.0028);
     sceneRef.current = scene;
 
     // 2. Camera
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.5, 1000);
-    camera.position.set(0, 15, 30);
+    camera.position.set(0, 14, 24);
     cameraRef.current = camera;
 
     // 3. WebGL Renderer
@@ -241,305 +241,319 @@ export default function Simulation3D({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.25;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Orbit Controls (Enabled in 'orbit' mode)
+    // 4. Orbit Controls (for 'orbit' mode)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
-    controls.minDistance = 5;
-    controls.maxDistance = 150;
+    controls.minDistance = 6;
+    controls.maxDistance = 220;
     controls.enabled = false;
     controlsRef.current = controls;
 
-    // 5. Environmental Lighting (Nighttime Automotive Atmosphere)
-    const ambientLight = new THREE.AmbientLight(0x0c1b30, 1.4);
+    // 5. Environmental Lighting (Nighttime City Automotive Mood)
+    const ambientLight = new THREE.AmbientLight(0x18283f, 1.8);
     scene.add(ambientLight);
 
-    const moonLight = new THREE.DirectionalLight(0x7dd3fc, 1.2);
-    moonLight.position.set(40, 80, 50);
+    const moonLight = new THREE.DirectionalLight(0xa5f3fc, 1.5);
+    moonLight.position.set(50, 100, 60);
     moonLight.castShadow = true;
     moonLight.shadow.mapSize.width = 2048;
     moonLight.shadow.mapSize.height = 2048;
     moonLight.shadow.camera.near = 0.5;
-    moonLight.shadow.camera.far = 250;
-    const d = 80;
+    moonLight.shadow.camera.far = 300;
+    const d = 110;
     moonLight.shadow.camera.left = -d;
     moonLight.shadow.camera.right = d;
     moonLight.shadow.camera.top = d;
     moonLight.shadow.camera.bottom = -d;
     scene.add(moonLight);
 
-    // Subtle blue fill light
-    const fillLight = new THREE.DirectionalLight(0x3285ff, 0.4);
-    fillLight.position.set(-50, 30, -50);
-    scene.add(fillLight);
+    const blueRimLight = new THREE.DirectionalLight(0x3285ff, 0.8);
+    blueRimLight.position.set(-60, 40, -60);
+    scene.add(blueRimLight);
 
-    // 6. Ground & Track Surface
-    const groundGeo = new THREE.PlaneGeometry(600, 600);
+    // 6. Authentic City Track Ground Plane (Using /simulator-assets/city.jpg)
+    const textureLoader = new THREE.TextureLoader();
+    const cityTexture = textureLoader.load('/simulator-assets/city.jpg');
+    cityTexture.colorSpace = THREE.SRGBColorSpace;
+
+    // Dimension: 986 × 980 mapped at scale 0.22 => 216.92 × 215.6
+    const groundGeo = new THREE.PlaneGeometry(216.92, 215.6);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x050c17,
-      roughness: 0.9,
-      metalness: 0.1
+      map: cityTexture,
+      roughness: 0.55,
+      metalness: 0.15
     });
     const groundMesh = new THREE.Mesh(groundGeo, groundMat);
     groundMesh.rotation.x = -Math.PI / 2;
-    groundMesh.position.y = -0.05;
+    groundMesh.position.set(0, 0, 0);
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
 
-    // Dark Asphalt Race Track Loop / Road
-    const trackWidth = 14;
-    const roadCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-100, 0, -60),
-      new THREE.Vector3(0, 0, -80),
-      new THREE.Vector3(100, 0, -60),
-      new THREE.Vector3(120, 0, 0),
-      new THREE.Vector3(100, 0, 60),
-      new THREE.Vector3(0, 0, 80),
-      new THREE.Vector3(-100, 0, 60),
-      new THREE.Vector3(-120, 0, 0)
-    ], true);
-
-    const roadGeo = new THREE.TubeGeometry(roadCurve, 120, trackWidth / 2, 4, true);
-    const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x091424,
-      roughness: 0.7,
-      metalness: 0.15
+    // Dark exterior terrain surrounding city map
+    const terrainGeo = new THREE.PlaneGeometry(600, 600);
+    const terrainMat = new THREE.MeshStandardMaterial({
+      color: 0x050c18,
+      roughness: 0.95
     });
-    const roadMesh = new THREE.Mesh(roadGeo, roadMat);
-    roadMesh.scale.set(1, 0.01, 1);
-    roadMesh.receiveShadow = true;
-    scene.add(roadMesh);
+    const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+    terrainMesh.rotation.x = -Math.PI / 2;
+    terrainMesh.position.y = -0.05;
+    scene.add(terrainMesh);
 
-    // Road Markings (Dashed Centerline)
-    const points = roadCurve.getPoints(80);
-    const lineMat = new THREE.LineDashedMaterial({
-      color: 0xffffff,
-      dashSize: 3,
-      gapSize: 2,
-      linewidth: 2
+    // 7. Architectural 3D City Buildings & Curbs on top of map
+    const buildingMat = new THREE.MeshStandardMaterial({
+      color: 0x0f1e33,
+      roughness: 0.4,
+      metalness: 0.5
     });
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(lineGeo, lineMat);
-    line.computeLineDistances();
-    line.position.y = 0.08;
-    scene.add(line);
-
-    // Neon Curbs / Borders
-    const curbMat1 = new THREE.MeshStandardMaterial({ color: 0x3285ff, emissive: 0x3285ff, emissiveIntensity: 0.3 });
-    const curbMat2 = new THREE.MeshStandardMaterial({ color: 0x00e6b8, emissive: 0x00e6b8, emissiveIntensity: 0.3 });
-
-    for (let i = 0; i < points.length; i += 2) {
-      const p = points[i];
-      const curbBox = new THREE.BoxGeometry(2, 0.3, 1);
-      const curbMesh = new THREE.Mesh(curbBox, i % 4 === 0 ? curbMat1 : curbMat2);
-      curbMesh.position.set(p.x * 1.08, 0.15, p.z * 1.08);
-      scene.add(curbMesh);
-    }
-
-    // 7. Track Obstacles & Barriers from Collision Data
-    const obstacleMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.5,
-      metalness: 0.3
-    });
-    const barrierMat = new THREE.MeshStandardMaterial({
-      color: 0xff4778,
-      emissive: 0xff4778,
-      emissiveIntensity: 0.25
+    const roofGlowMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.4
     });
 
-    COLLISION_OBSTACLES.forEach((obs, idx) => {
-      // Scale 2D simulator coords into 3D world coords
+    COLLISION_OBSTACLES.forEach((obs) => {
+      // Map 2D simulator coordinates into 3D world space
       const ox = (obs.x - 493) * 0.22;
       const oz = (obs.y - 490) * 0.22;
-      const ow = Math.max(3, obs.width * 0.22);
-      const oh = Math.max(3, obs.height * 0.22);
+      const ow = Math.max(2, obs.width * 0.22);
+      const oh = Math.max(2, obs.height * 0.22);
 
-      const blockGeo = new THREE.BoxGeometry(ow, 3.5, oh);
-      const blockMesh = new THREE.Mesh(blockGeo, obstacleMat);
-      blockMesh.position.set(ox + ow / 2, 1.75, oz + oh / 2);
-      blockMesh.castShadow = true;
-      blockMesh.receiveShadow = true;
-      scene.add(blockMesh);
+      // Distinguish perimeter walls vs interior buildings
+      const isPerimeter = obs.width > 800 || obs.height > 800;
 
-      // Warning hazard stripe / border on top of obstacle
-      const stripeGeo = new THREE.BoxGeometry(ow * 0.95, 0.4, oh * 0.95);
-      const stripeMesh = new THREE.Mesh(stripeGeo, barrierMat);
-      stripeMesh.position.set(ox + ow / 2, 3.5, oz + oh / 2);
-      scene.add(stripeMesh);
+      if (isPerimeter) {
+        // Outer track boundary guardrail
+        const wallGeo = new THREE.BoxGeometry(ow, 1.8, oh);
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x183653, roughness: 0.8 });
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.position.set(ox + ow / 2, 0.9, oz + oh / 2);
+        scene.add(wallMesh);
+      } else {
+        // Modern 3D building block
+        const bHeight = 4.5;
+        const bGeo = new THREE.BoxGeometry(ow, bHeight, oh);
+        const bMesh = new THREE.Mesh(bGeo, buildingMat);
+        bMesh.position.set(ox + ow / 2, bHeight / 2, oz + oh / 2);
+        bMesh.castShadow = true;
+        bMesh.receiveShadow = true;
+        scene.add(bMesh);
+
+        // Illuminated rooftop neon edge
+        const roofGeo = new THREE.BoxGeometry(ow * 0.96, 0.2, oh * 0.96);
+        const roofMesh = new THREE.Mesh(roofGeo, roofGlowMat);
+        roofMesh.position.set(ox + ow / 2, bHeight + 0.1, oz + oh / 2);
+        scene.add(roofMesh);
+      }
     });
 
-    // 8. Build Procedural High-Detail 3D Sports Car
+    // 8. Build High-Visibility, Striking Sports Car
     const carGroup = new THREE.Group();
 
-    // Car Body / Chassis (Aerodynamic Sports Coupe)
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x3285ff,       // Electric Blue body
-      roughness: 0.2,
+    // High-contrast brilliant electric racing cyan/blue
+    const carPaintMat = new THREE.MeshStandardMaterial({
+      color: 0x00c8ff,       // Brilliant electric cyan-blue
+      roughness: 0.15,
       metalness: 0.85
     });
-    const bodyGeo = new THREE.BoxGeometry(2.4, 0.8, 5.0);
-    const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-    bodyMesh.position.y = 0.7;
+
+    const whiteStripeMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.2,
+      metalness: 0.2
+    });
+
+    const darkTrimMat = new THREE.MeshStandardMaterial({
+      color: 0x0a1424,
+      roughness: 0.6
+    });
+
+    // Main Car Body (Length: 5.6, Width: 2.8, Height: 1.0)
+    const bodyGeo = new THREE.BoxGeometry(2.8, 0.9, 5.6);
+    const bodyMesh = new THREE.Mesh(bodyGeo, carPaintMat);
+    bodyMesh.position.y = 0.85;
     bodyMesh.castShadow = true;
     carGroup.add(bodyMesh);
 
-    // Cabin / Windshield (Tinted glass)
-    const glassMat = new THREE.MeshStandardMaterial({
+    // Bold White Center Racing Stripe
+    const stripeGeo = new THREE.BoxGeometry(0.65, 0.92, 5.62);
+    const stripeMesh = new THREE.Mesh(stripeGeo, whiteStripeMat);
+    stripeMesh.position.y = 0.85;
+    carGroup.add(stripeMesh);
+
+    // Aerodynamic Cabin / Windshield (Gloss black glass)
+    const cabinGlassMat = new THREE.MeshStandardMaterial({
       color: 0x06101f,
-      roughness: 0.1,
-      metalness: 0.9,
-      transparent: true,
-      opacity: 0.88
+      roughness: 0.05,
+      metalness: 0.95
     });
-    const cabinGeo = new THREE.BoxGeometry(1.9, 0.65, 2.4);
-    const cabinMesh = new THREE.Mesh(cabinGeo, glassMat);
-    cabinMesh.position.set(0, 1.35, -0.3);
+    const cabinGeo = new THREE.BoxGeometry(2.2, 0.75, 2.8);
+    const cabinMesh = new THREE.Mesh(cabinGeo, cabinGlassMat);
+    cabinMesh.position.set(0, 1.55, -0.3);
     cabinMesh.castShadow = true;
     carGroup.add(cabinMesh);
 
-    // Front Hood Slope & Splitter
-    const splitterMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
-    const splitterGeo = new THREE.BoxGeometry(2.5, 0.15, 1.2);
-    const splitterMesh = new THREE.Mesh(splitterGeo, splitterMat);
-    splitterMesh.position.set(0, 0.25, 2.4);
-    carGroup.add(splitterMesh);
+    // Front Splitter
+    const splitterGeo = new THREE.BoxGeometry(2.9, 0.15, 1.0);
+    const splitter = new THREE.Mesh(splitterGeo, darkTrimMat);
+    splitter.position.set(0, 0.35, 2.7);
+    carGroup.add(splitter);
 
-    // Rear Spoiler
-    const spoilerMat = new THREE.MeshStandardMaterial({ color: 0x183653, roughness: 0.4 });
-    const spoilerGeo = new THREE.BoxGeometry(2.6, 0.1, 0.8);
-    const spoilerMesh = new THREE.Mesh(spoilerGeo, spoilerMat);
-    spoilerMesh.position.set(0, 1.5, -2.4);
-    carGroup.add(spoilerMesh);
+    // Rear High-Downforce Spoiler
+    const spoilerGeo = new THREE.BoxGeometry(3.0, 0.12, 0.9);
+    const spoiler = new THREE.Mesh(spoilerGeo, darkTrimMat);
+    spoiler.position.set(0, 1.8, -2.6);
+    carGroup.add(spoiler);
 
-    // Spoiler Struts
-    const strutGeo = new THREE.BoxGeometry(0.12, 0.4, 0.3);
-    const strutLeft = new THREE.Mesh(strutGeo, spoilerMat);
-    strutLeft.position.set(-0.8, 1.25, -2.4);
-    const strutRight = new THREE.Mesh(strutGeo, spoilerMat);
-    strutRight.position.set(0.8, 1.25, -2.4);
-    carGroup.add(strutLeft);
-    carGroup.add(strutRight);
+    const strutGeo = new THREE.BoxGeometry(0.12, 0.5, 0.3);
+    const strutL = new THREE.Mesh(strutGeo, darkTrimMat);
+    strutL.position.set(-0.9, 1.5, -2.6);
+    const strutR = new THREE.Mesh(strutGeo, darkTrimMat);
+    strutR.position.set(0.9, 1.5, -2.6);
+    carGroup.add(strutL);
+    carGroup.add(strutR);
 
-    // 4 Alloy Wheels with Rubber Tires
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
-    const rimMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.9, roughness: 0.2 });
+    // 4 Wide Alloy Wheels with Silver Rims
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.9, roughness: 0.15 });
     const wheelPositions = [
-      [-1.25, 0.45, 1.5],   // Front Left
-      [1.25, 0.45, 1.5],    // Front Right
-      [-1.25, 0.45, -1.5],  // Rear Left
-      [1.25, 0.45, -1.5]    // Rear Right
+      [-1.45, 0.5, 1.7],
+      [1.45, 0.5, 1.7],
+      [-1.45, 0.5, -1.7],
+      [1.45, 0.5, -1.7]
     ];
 
     wheelPositions.forEach(pos => {
-      const wheelGroup = new THREE.Group();
-      const tireGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.35, 16);
-      const tire = new THREE.Mesh(tireGeo, wheelMat);
+      const wGroup = new THREE.Group();
+      const tireGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.42, 16);
+      const tire = new THREE.Mesh(tireGeo, tireMat);
       tire.rotation.z = Math.PI / 2;
       tire.castShadow = true;
-      wheelGroup.add(tire);
+      wGroup.add(tire);
 
-      const rimGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.36, 8);
+      const rimGeo = new THREE.CylinderGeometry(0.32, 0.32, 0.43, 8);
       const rim = new THREE.Mesh(rimGeo, rimMat);
       rim.rotation.z = Math.PI / 2;
-      wheelGroup.add(rim);
+      wGroup.add(rim);
 
-      wheelGroup.position.set(...pos);
-      carGroup.add(wheelGroup);
+      wGroup.position.set(...pos);
+      carGroup.add(wGroup);
     });
 
-    // Dual LED Headlights with active Three.js Spotlight
+    // Dual High-Intensity LED Headlights
     const headlightMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 1.5
+      emissive: 0x7dd3fc,
+      emissiveIntensity: 2.2
     });
-    const hlGeo = new THREE.BoxGeometry(0.4, 0.18, 0.1);
-    const hlLeft = new THREE.Mesh(hlGeo, headlightMat);
-    hlLeft.position.set(-0.8, 0.7, 2.5);
-    const hlRight = new THREE.Mesh(hlGeo, headlightMat);
-    hlRight.position.set(0.8, 0.7, 2.5);
-    carGroup.add(hlLeft);
-    carGroup.add(hlRight);
+    const hlGeo = new THREE.BoxGeometry(0.5, 0.2, 0.12);
+    const hlL = new THREE.Mesh(hlGeo, headlightMat);
+    hlL.position.set(-0.95, 0.85, 2.8);
+    const hlR = new THREE.Mesh(hlGeo, headlightMat);
+    hlR.position.set(0.95, 0.85, 2.8);
+    carGroup.add(hlL);
+    carGroup.add(hlR);
 
-    // Spotlights casting light cones onto the dark road
-    const spotLeft = new THREE.SpotLight(0x7dd3fc, 3.5, 35, Math.PI / 6, 0.4, 1.5);
-    spotLeft.position.set(-0.8, 0.7, 2.5);
-    const spotTarget = new THREE.Object3D();
-    spotTarget.position.set(0, 0, 20);
-    carGroup.add(spotTarget);
-    spotLeft.target = spotTarget;
-    carGroup.add(spotLeft);
+    // Forward Spotlights Illuminating the Road Surface
+    const spotL = new THREE.SpotLight(0xa5f3fc, 4.0, 45, Math.PI / 5, 0.4, 1.2);
+    spotL.position.set(-0.95, 0.85, 2.8);
+    const spotTargetL = new THREE.Object3D();
+    spotTargetL.position.set(-0.95, 0, 25);
+    carGroup.add(spotTargetL);
+    spotL.target = spotTargetL;
+    carGroup.add(spotL);
 
-    // Rear Coral Red Taillights
+    const spotR = new THREE.SpotLight(0xa5f3fc, 4.0, 45, Math.PI / 5, 0.4, 1.2);
+    spotR.position.set(0.95, 0.85, 2.8);
+    const spotTargetR = new THREE.Object3D();
+    spotTargetR.position.set(0.95, 0, 25);
+    carGroup.add(spotTargetR);
+    spotR.target = spotTargetR;
+    carGroup.add(spotR);
+
+    // Rear Coral Red LED Taillights
     const taillightMat = new THREE.MeshStandardMaterial({
       color: 0xff4778,
       emissive: 0xff4778,
-      emissiveIntensity: 1.2
+      emissiveIntensity: 2.0
     });
-    const tlGeo = new THREE.BoxGeometry(0.5, 0.15, 0.1);
-    const tlLeft = new THREE.Mesh(tlGeo, taillightMat);
-    tlLeft.position.set(-0.8, 0.75, -2.5);
-    const tlRight = new THREE.Mesh(tlGeo, taillightMat);
-    tlRight.position.set(0.8, 0.75, -2.5);
-    carGroup.add(tlLeft);
-    carGroup.add(tlRight);
+    const tlGeo = new THREE.BoxGeometry(0.65, 0.2, 0.12);
+    const tlL = new THREE.Mesh(tlGeo, taillightMat);
+    tlL.position.set(-0.95, 0.9, -2.8);
+    const tlR = new THREE.Mesh(tlGeo, taillightMat);
+    tlR.position.set(0.95, 0.9, -2.8);
+    carGroup.add(tlL);
+    carGroup.add(tlR);
 
-    // Chassis Underglow (Soft electric blue neon on asphalt)
-    const underglowLight = new THREE.PointLight(0x3285ff, 1.5, 5);
-    underglowLight.position.set(0, 0.2, 0);
-    carGroup.add(underglowLight);
+    // Glowing Neon Chassis Underglow (Visible blue/cyan halo on road)
+    const underglow = new THREE.PointLight(0x00d2ff, 3.0, 8);
+    underglow.position.set(0, 0.25, 0);
+    carGroup.add(underglow);
+
+    // Optional: GLTF car model overlay if loaded
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/car.glb', (gltf) => {
+      const model = gltf.scene;
+      model.scale.set(1.4, 1.4, 1.4);
+      model.position.set(0, 0.2, 0);
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      // Replace body mesh if model loaded
+      bodyMesh.visible = false;
+      stripeMesh.visible = false;
+      carGroup.add(model);
+    }, undefined, () => {
+      // Procedural car remains 100% active
+    });
 
     scene.add(carGroup);
     carGroupRef.current = carGroup;
 
-    // 9. 5-Channel LiDAR Beams
-    const rays = [];
+    // 9. 5-Channel LiDAR Beams (Line + Glowing Endpoint)
+    const lines = [];
     const hits = [];
-    const rayDirections = [
-      0,               // Front
-      -Math.PI / 4,    // Front-Left
-      Math.PI / 4,     // Front-Right
-      -Math.PI / 2,    // Left
-      Math.PI / 2      // Right
-    ];
 
-    rayDirections.forEach(() => {
-      // Beam cylinder
-      const beamGeo = new THREE.CylinderGeometry(0.04, 0.04, 1, 8);
-      const beamMat = new THREE.MeshStandardMaterial({
+    for (let i = 0; i < 5; i++) {
+      // Dynamic Line Geometry
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0.8, 0),
+        new THREE.Vector3(0, 0.8, 10)
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({
         color: 0x00e6b8,
-        emissive: 0x00e6b8,
-        emissiveIntensity: 0.8,
-        transparent: true,
-        opacity: 0.85
+        linewidth: 2
       });
-      const beamMesh = new THREE.Mesh(beamGeo, beamMat);
-      scene.add(beamMesh);
-      rays.push(beamMesh);
+      const line = new THREE.Line(lineGeo, lineMat);
+      scene.add(line);
+      lines.push(line);
 
-      // Glowing hitpoint sphere
-      const hitGeo = new THREE.SphereGeometry(0.2, 12, 12);
+      // Hitpoint Sphere
+      const hitGeo = new THREE.SphereGeometry(0.35, 12, 12);
       const hitMat = new THREE.MeshStandardMaterial({
         color: 0x00e6b8,
         emissive: 0x00e6b8,
-        emissiveIntensity: 1.2
+        emissiveIntensity: 1.5
       });
       const hitMesh = new THREE.Mesh(hitGeo, hitMat);
       scene.add(hitMesh);
       hits.push(hitMesh);
-    });
+    }
 
-    lidarRaysRef.current = rays;
+    lidarLinesRef.current = lines;
     lidarHitsRef.current = hits;
 
-    // 10. Animation Rendering Loop
+    // 10. Animation & Follow Camera Loop
     let animationFrameId;
 
     const animate = () => {
@@ -548,86 +562,85 @@ export default function Simulation3D({
       const t = telemetryRef.current;
       const currentCameraMode = cameraModeRef.current;
 
-      // Update Car Position in 3D World Space
       if (carGroupRef.current && t) {
-        // Map 2D simulator coordinates (0..986, 0..980) into Three.js 3D coordinates
+        // Map 2D simulator space (0..986, 0..980) into Three.js 3D space
         const targetX = ((t.position?.x ?? 400) - 493) * 0.22;
         const targetZ = ((t.position?.y ?? 300) - 490) * 0.22;
-        // In 2D, angle is degrees from +X axis; in Three.js Z is forward, so we rotate around Y
-        const targetAngle = -((t.angle ?? 0) * Math.PI) / 180 + Math.PI / 2;
+        // In 2D, angle 0 is +X axis; in Three.js Z is forward so targetAngle = -angleRad + PI/2
+        const angleDeg = t.angle ?? 0;
+        const targetAngle = -((angleDeg * Math.PI) / 180) + Math.PI / 2;
 
         // Smooth vehicle position lerping
-        carGroupRef.current.position.x += (targetX - carGroupRef.current.position.x) * 0.3;
-        carGroupRef.current.position.z += (targetZ - carGroupRef.current.position.z) * 0.3;
+        carGroupRef.current.position.x += (targetX - carGroupRef.current.position.x) * 0.35;
+        carGroupRef.current.position.z += (targetZ - carGroupRef.current.position.z) * 0.35;
         carGroupRef.current.rotation.y = targetAngle;
 
         const carPos = carGroupRef.current.position;
 
         // Camera Modes
         if (currentCameraMode === 'follow') {
-          // Third-Person Chase Follow Camera
           controls.enabled = false;
-          const chaseDist = 18;
-          const chaseHeight = 8;
+          // Position follow camera directly behind car looking ahead
+          const chaseDist = 14;
+          const chaseHeight = 5.8;
           const camX = carPos.x - Math.sin(targetAngle) * chaseDist;
           const camZ = carPos.z - Math.cos(targetAngle) * chaseDist;
 
-          camera.position.x += (camX - camera.position.x) * 0.12;
-          camera.position.y += (chaseHeight - camera.position.y) * 0.12;
-          camera.position.z += (camZ - camera.position.z) * 0.12;
+          camera.position.x += (camX - camera.position.x) * 0.15;
+          camera.position.y += (chaseHeight - camera.position.y) * 0.15;
+          camera.position.z += (camZ - camera.position.z) * 0.15;
           camera.lookAt(carPos.x, carPos.y + 1.2, carPos.z);
         } else if (currentCameraMode === 'top') {
-          // Top-Down Bird's-Eye View
           controls.enabled = false;
-          camera.position.set(carPos.x, 70, carPos.z + 0.1);
+          // Overhead tactical eagle-eye view
+          camera.position.set(carPos.x, 115, carPos.z + 0.1);
           camera.lookAt(carPos.x, 0, carPos.z);
         } else if (currentCameraMode === 'orbit') {
-          // User Orbit Controls
           controls.enabled = true;
           controls.target.set(carPos.x, carPos.y + 1, carPos.z);
           controls.update();
         }
 
-        // Update 5-Channel LiDAR Beams in 3D
+        // Update 5 LiDAR Beams radiating from front bumper
         const sensors = t.sensors || {};
         const sensorKeys = ['front', 'front_left', 'front_right', 'left', 'right'];
         const rayAngles = [0, -Math.PI / 4, Math.PI / 4, -Math.PI / 2, Math.PI / 2];
 
         sensorKeys.forEach((key, idx) => {
           const sDist = sensors[key] ?? 1.0;
-          const maxBeamLen = 32.0;
-          const beamLen = maxBeamLen * sDist;
+          const maxDist = 32.0;
+          const beamLen = maxDist * sDist;
           const beamAngle = targetAngle + rayAngles[idx];
 
-          const startX = carPos.x + Math.sin(targetAngle) * 2.2;
-          const startZ = carPos.z + Math.cos(targetAngle) * 2.2;
+          // Bumper origin
+          const startX = carPos.x + Math.sin(targetAngle) * 2.8;
+          const startZ = carPos.z + Math.cos(targetAngle) * 2.8;
 
+          // Hitpoint
           const endX = startX + Math.sin(beamAngle) * beamLen;
           const endZ = startZ + Math.cos(beamAngle) * beamLen;
 
-          const midX = (startX + endX) / 2;
-          const midZ = (startZ + endZ) / 2;
+          const line = lidarLinesRef.current[idx];
+          const hit = lidarHitsRef.current[idx];
 
-          const rayMesh = lidarRaysRef.current[idx];
-          const hitMesh = lidarHitsRef.current[idx];
+          if (line && hit) {
+            // Update line vertices
+            const posAttr = line.geometry.attributes.position;
+            posAttr.setXYZ(0, startX, 0.8, startZ);
+            posAttr.setXYZ(1, endX, 0.8, endZ);
+            posAttr.needsUpdate = true;
 
-          if (rayMesh && hitMesh) {
-            rayMesh.position.set(midX, 0.7, midZ);
-            rayMesh.scale.set(1, beamLen, 1);
-            rayMesh.rotation.y = beamAngle;
-            rayMesh.rotation.x = Math.PI / 2;
+            // Update hitpoint
+            hit.position.set(endX, 0.8, endZ);
 
-            hitMesh.position.set(endX, 0.7, endZ);
+            // Proximity color tint
+            let colorHex = 0x00e6b8; // neon mint
+            if (sDist < 0.28) colorHex = 0xff4778; // collision red
+            else if (sDist < 0.50) colorHex = 0xffc857; // warning amber
 
-            // Dynamically tint beam based on proximity
-            let colorHex = 0x00e6b8; // mint
-            if (sDist < 0.25) colorHex = 0xff4778; // danger
-            else if (sDist < 0.50) colorHex = 0xffc857; // warning
-
-            rayMesh.material.color.setHex(colorHex);
-            rayMesh.material.emissive.setHex(colorHex);
-            hitMesh.material.color.setHex(colorHex);
-            hitMesh.material.emissive.setHex(colorHex);
+            line.material.color.setHex(colorHex);
+            hit.material.color.setHex(colorHex);
+            hit.material.emissive.setHex(colorHex);
           }
         });
       }
@@ -637,7 +650,6 @@ export default function Simulation3D({
 
     animate();
 
-    // 11. Window Resize Handler
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
       const w = container.clientWidth;
@@ -659,7 +671,6 @@ export default function Simulation3D({
     };
   }, []);
 
-  // Update camera mode ref
   useEffect(() => {
     cameraModeRef.current = cameraMode;
   }, [cameraMode]);
@@ -672,26 +683,23 @@ export default function Simulation3D({
     const { width, height } = canvas;
 
     ctx.clearRect(0, 0, width, height);
-
-    // Minimap background
     ctx.fillStyle = '#06101F';
     ctx.fillRect(0, 0, width, height);
 
-    // Track perimeter
     ctx.strokeStyle = '#183653';
     ctx.lineWidth = 1;
-    ctx.strokeRect(4, 4, width - 8, height - 8);
+    ctx.strokeRect(3, 3, width - 6, height - 6);
 
     const sx = width / 986;
     const sy = height / 980;
 
     // Obstacles
-    ctx.fillStyle = 'rgba(255, 71, 120, 0.4)';
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
     COLLISION_OBSTACLES.forEach(obs => {
       ctx.fillRect(obs.x * sx, obs.y * sy, obs.width * sx, obs.height * sy);
     });
 
-    // Vehicle position blip
+    // Vehicle
     const vx = (telemetry?.position?.x ?? 400) * sx;
     const vy = (telemetry?.position?.y ?? 300) * sy;
     const vAngle = ((telemetry?.angle ?? 0) * Math.PI) / 180;
@@ -700,12 +708,11 @@ export default function Simulation3D({
     ctx.translate(vx, vy);
     ctx.rotate(vAngle);
 
-    // Vehicle triangle
     ctx.fillStyle = '#00E6B8';
     ctx.beginPath();
-    ctx.moveTo(5, 0);
-    ctx.lineTo(-4, -3);
-    ctx.lineTo(-4, 3);
+    ctx.moveTo(6, 0);
+    ctx.lineTo(-4, -3.5);
+    ctx.lineTo(-4, 3.5);
     ctx.closePath();
     ctx.fill();
 
@@ -716,7 +723,6 @@ export default function Simulation3D({
 
   return (
     <SimContainer>
-      {/* Three.js Container */}
       <ThreeCanvas ref={mountRef} />
 
       {/* Top-Left LiDAR HUD */}
@@ -734,7 +740,7 @@ export default function Simulation3D({
         ].map(s => {
           const val = sensors[s.key] ?? 1.0;
           let valColor = THEME.success;
-          if (val < 0.25) valColor = THEME.danger;
+          if (val < 0.28) valColor = THEME.danger;
           else if (val < 0.50) valColor = THEME.warning;
 
           return (
@@ -784,10 +790,10 @@ export default function Simulation3D({
 
       {/* Bottom-Left Minimap */}
       <MinimapWrapper>
-        <canvas ref={minimapCanvasRef} width={130} height={130} />
+        <canvas ref={minimapCanvasRef} width={135} height={135} />
       </MinimapWrapper>
 
-      {/* Bottom Center Simulation Action Bar */}
+      {/* Bottom Center Toolbar */}
       <SimToolbar>
         <ControlButton onClick={onTogglePause}>
           {isPaused ? <Play size={14} color={THEME.success} /> : <Pause size={14} color={THEME.warning} />}

@@ -1,16 +1,16 @@
 {
-  "episode": 61173,
-  "step": 1,
-  "total_reward": -10.000,
+  "episode": 89129,
+  "step": 0,
+  "total_reward": 0.000,
   "avg_reward": -10.000,
   "epsilon": 0.0500,
   "position": {"x": 400.00, "y": 300.00},
   "angle": 0.00,
-  "speed": -0.000,
+  "speed": 0.000,
   "steering": 0.000,
-  "sensors": {"front": 1.0, "left": 1.0, "right": 1.0, "front_left": 1.0, "front_right": 1.0},
-  "collisions": 1,
-  "last_action": "DONE",
+  "sensors": {"front": 1.000, "front_left": 1.000, "front_right": 1.000, "left": 1.000, "right": 1.000},
+  "collisions": 0,
+  "last_action": "DO_NOTHING",
   "window_width": 986,
   "window_height": 980
 }

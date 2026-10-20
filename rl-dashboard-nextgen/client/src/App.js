@@ -277,38 +277,109 @@ export default function App() {
     return 1.0;
   }, []);
 
+  // Continuous Keyboard Key Tracking for Silky-Smooth Manual Drive
+  const keysPressedRef = useRef({});
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+      keysPressedRef.current[e.code] = true;
+    };
+
+    const handleKeyUp = (e) => {
+      keysPressedRef.current[e.code] = false;
+    };
+
+    const handleBlur = () => {
+      keysPressedRef.current = {};
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   // In-Browser Simulation Physics Loop (Executes when in 'browser' or 'training' mode)
   useEffect(() => {
     if (simulationMode === 'cpp' || isPaused) return;
 
-    const intervalTime = Math.max(10, Math.floor(35 / simSpeed));
+    let stuckCounter = 0;
+    let lastBeepTime = 0;
+    const intervalTime = Math.max(12, Math.floor(20 / simSpeed));
+
     const timer = setInterval(() => {
       const car = browserSimRef.current;
+      const keys = keysPressedRef.current;
       car.step += 1;
 
-      // Autopilot Q-Learning logic if manual control is not overriding
-      if (!manualDriveActive) {
+      if (manualDriveActive) {
+        // Direct, High-Responsiveness Manual Driving Controls
+        const isForward = keys['KeyW'] || keys['ArrowUp'];
+        const isBrake = keys['KeyS'] || keys['ArrowDown'];
+        const isLeft = keys['KeyA'] || keys['ArrowLeft'];
+        const isRight = keys['KeyD'] || keys['ArrowRight'];
+        const isHandbrake = keys['Space'];
+
+        if (isForward) {
+          car.velocity = Math.min(3.8, car.velocity + 0.22);
+          car.lastAction = 'ACCELERATE';
+        } else if (isBrake) {
+          car.velocity = Math.max(-1.8, car.velocity - 0.35);
+          car.lastAction = 'BRAKE';
+        } else if (isHandbrake) {
+          car.velocity *= 0.82;
+          car.lastAction = 'BRAKE';
+        } else {
+          // Natural coasting drag
+          car.velocity *= 0.982;
+          if (Math.abs(car.velocity) < 0.04) car.velocity = 0;
+        }
+
+        const turnFactor = Math.abs(car.velocity) > 0.08 ? (car.velocity >= 0 ? 1 : -1) : 0.4;
+        if (isLeft) {
+          car.angle -= 3.6 * turnFactor;
+          car.steering = -0.4;
+          if (!isForward && !isBrake) car.lastAction = 'TURN_LEFT';
+        } else if (isRight) {
+          car.angle += 3.6 * turnFactor;
+          car.steering = 0.4;
+          if (!isForward && !isBrake) car.lastAction = 'TURN_RIGHT';
+        } else {
+          car.steering *= 0.7;
+          if (!isForward && !isBrake && !isHandbrake && Math.abs(car.velocity) < 0.05) {
+            car.lastAction = 'DO_NOTHING';
+          }
+        }
+      } else {
+        // Smooth Autonomous Q-Learning / PD Autopilot
         const sFront = castRay(car.x, car.y, car.angle);
         const sLeft = castRay(car.x, car.y, car.angle - 45);
         const sRight = castRay(car.x, car.y, car.angle + 45);
 
-        if (sFront < 0.32) {
+        if (sFront < 0.42) {
           // Obstacle detected ahead: steer towards clearer direction
           if (sLeft > sRight) {
-            car.steering = -0.35;
-            car.angle -= 9;
-            car.velocity = Math.max(1.2, car.velocity * 0.90);
+            car.steering = -0.4;
+            car.angle -= 3.8;
+            car.velocity = Math.max(1.4, car.velocity * 0.92);
             car.lastAction = 'TURN_LEFT';
           } else {
-            car.steering = 0.35;
-            car.angle += 9;
-            car.velocity = Math.max(1.2, car.velocity * 0.90);
+            car.steering = 0.4;
+            car.angle += 3.8;
+            car.velocity = Math.max(1.4, car.velocity * 0.92);
             car.lastAction = 'TURN_RIGHT';
           }
         } else {
-          // Open road ahead: accelerate
-          car.velocity = Math.min(3.6, car.velocity + 0.14);
-          car.steering = 0;
+          // Open road: smooth lane centering and acceleration
+          const centering = (sLeft - sRight) * 1.1;
+          car.angle += centering;
+          car.steering = centering * 0.2;
+          car.velocity = Math.min(3.2, car.velocity + 0.12);
           car.lastAction = 'ACCELERATE';
         }
       }
@@ -318,14 +389,19 @@ export default function App() {
       car.x += Math.cos(rad) * car.velocity;
       car.y += Math.sin(rad) * car.velocity;
 
-      // Boundary & Obstacle Collision Checks
+      // Obstacle Collision Detection with 14px car radius
       let collided = false;
-      if (car.x < 30 || car.x > 950 || car.y < 30 || car.y > 950) {
+      if (car.x < 35 || car.x > 945 || car.y < 35 || car.y > 945) {
         collided = true;
       } else {
         for (let i = 0; i < COLLISION_OBSTACLES.length; i++) {
           const obs = COLLISION_OBSTACLES[i];
-          if (car.x >= obs.x && car.x <= obs.x + obs.width && car.y >= obs.y && car.y <= obs.y + obs.height) {
+          if (
+            car.x >= obs.x - 12 &&
+            car.x <= obs.x + obs.width + 12 &&
+            car.y >= obs.y - 12 &&
+            car.y <= obs.y + obs.height + 12
+          ) {
             collided = true;
             break;
           }
@@ -341,28 +417,46 @@ export default function App() {
       };
 
       if (collided) {
-        car.collisions += 1;
-        car.totalReward -= 12;
-        audioManager.playCollisionBeep();
+        stuckCounter += 1;
+        const now = Date.now();
+        if (now - lastBeepTime > 350) {
+          audioManager.playCollisionBeep();
+          lastBeepTime = now;
+        }
 
-        // Respawn vehicle on track
-        car.episode += 1;
-        car.step = 0;
-        car.x = 400;
-        car.y = 300;
-        car.angle = 0;
-        car.velocity = 1.0;
-        car.totalReward = 0;
-        car.epsilon = Math.max(0.05, car.epsilon * 0.99);
+        if (manualDriveActive) {
+          // In Manual Drive: bounce back slightly so user can steer out naturally
+          car.velocity = -car.velocity * 0.5;
+          car.x -= Math.cos(rad) * 6;
+          car.y -= Math.sin(rad) * 6;
+        } else {
+          // In Autopilot: if stuck for multiple steps, respawn cleanly
+          if (stuckCounter > 25) {
+            car.collisions += 1;
+            car.totalReward -= 10;
+            car.episode += 1;
+            car.step = 0;
+            car.x = 400;
+            car.y = 300;
+            car.angle = 0;
+            car.velocity = 1.5;
+            stuckCounter = 0;
+          } else {
+            // Rebound slightly and steer away
+            car.velocity = Math.max(0.8, car.velocity * 0.85);
+            car.angle += 12;
+          }
+        }
       } else {
-        car.totalReward += 0.25 + (car.velocity * 0.08);
+        stuckCounter = 0;
+        car.totalReward += 0.2 + (Math.abs(car.velocity) * 0.08);
       }
 
       const updatedSnapshot = {
         episode: car.episode,
         step: car.step,
         total_reward: car.totalReward,
-        avg_reward: car.totalReward / Math.max(1, car.step * 0.05),
+        avg_reward: car.totalReward / Math.max(1, car.step * 0.04),
         epsilon: car.epsilon,
         position: { x: car.x, y: car.y },
         angle: car.angle,
@@ -377,7 +471,7 @@ export default function App() {
 
       setTelemetry(updatedSnapshot);
 
-      if (car.step % 25 === 0) {
+      if (car.step % 30 === 0) {
         setRewardHistory(prev => [
           ...prev.slice(-300),
           { episode: car.episode, reward: car.totalReward, epsilon: car.epsilon }
@@ -387,44 +481,6 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, [simulationMode, isPaused, manualDriveActive, simSpeed, castRay]);
-
-  // Keyboard Event Handlers for Manual Drive (W / A / S / D or Arrows)
-  useEffect(() => {
-    if (simulationMode !== 'browser' || !manualDriveActive) return;
-
-    const handleKeyDown = (e) => {
-      // Prevent key handling if typing in input fields
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
-
-      const car = browserSimRef.current;
-      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-        car.velocity = Math.min(4.2, car.velocity + 0.35);
-        car.lastAction = 'ACCELERATE';
-      } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
-        car.velocity = Math.max(-1.5, car.velocity - 0.45);
-        car.lastAction = 'BRAKE';
-      } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
-        car.angle -= 9;
-        car.steering = -0.3;
-        car.lastAction = 'TURN_LEFT';
-      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
-        car.angle += 9;
-        car.steering = 0.3;
-        car.lastAction = 'TURN_RIGHT';
-      }
-    };
-
-    const handleKeyUp = () => {
-      browserSimRef.current.steering = 0;
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [simulationMode, manualDriveActive]);
 
   // Reset vehicle position handler
   const handleResetVehicle = () => {
